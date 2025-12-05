@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DosiLab: Simulador DVH Avanzado (HTML/JS)</title>
+    <!-- Incluir Tailwind CSS CDN para un estilo moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Incluir Lucide icons (usado en React, se simula con SVG o clases de utilidad) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Roboto Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos básicos para la visualización del layout */
+        .h-screen-full {
+            height: 100vh;
+        }
+        /* Estilo para que el SVG tenga un aspecto de gráfica */
+        .dvh-graph svg {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 font-sans overflow-hidden">
+
+    <div id="app" class="flex flex-col md:flex-row h-screen-full overflow-hidden">
+        
+        <!-- --- PANEL IZQUIERDO: CONTROLES --- -->
+        <div class="w-full md:w-1/3 p-4 overflow-y-auto border-r border-gray-800 flex flex-col gap-4">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2 text-indigo-400">
+                    <!-- Icono Zap (Simulado) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <h1 class="text-xl font-bold">DosiLab v2.2 (HTML)</h1>
+                </div>
+                <button onclick="resetApp()" class="text-gray-500 hover:text-white" title="Resetear Todo">
+                    <!-- Icono RefreshCcw (Simulado) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                </button>
+            </div>
+
+            <!-- Selector de MODO -->
+            <div class="grid grid-cols-2 gap-2 bg-gray-900 p-1 rounded-lg border border-gray-700">
+                <button id="mode-planning" onclick="setMode('planning')" class="flex items-center justify-center gap-2 py-2 text-sm rounded-md transition bg-indigo-600 text-white font-medium">
+                    <!-- Icono Zap -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Planificación
+                </button>
+                <button id="mode-anatomy" onclick="setMode('anatomy')" class="flex items-center justify-center gap-2 py-2 text-sm rounded-md transition text-gray-400 hover:bg-gray-800">
+                    <!-- Icono Settings -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1-2 2H4a2 2 0 0 0-2 2v.44a2 2 0 0 1-2 2h-.44a2 2 0 0 0-2 2v.44a2 2 0 0 1 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 1 2 2h.44a2 2 0 0 0 2 2v.44a2 2 0 0 1 2 2h.44a2 2 0 0 0 2-2v-.44a2 2 0 0 1 2-2h.44a2 2 0 0 0 2-2v-.44a2 2 0 0 1 2-2h.44a2 2 0 0 0 2-2v-.44a2 2 0 0 1-2-2h-.44a2 2 0 0 0-2-2v-.44a2 2 0 0 1-2-2h-.44a2 2 0 0 0-2-2v-.44a2 2 0 0 1-2-2h-.44z"/><circle cx="12" cy="12" r="3"/></svg> Anatomía
+                </button>
+            </div>
+
+            <div id="controls-panel" class="flex-1 flex flex-col gap-3">
+                <!-- Los controles de haces o anatomía se renderizarán aquí -->
+            </div>
+        </div>
+
+        <!-- --- PANEL DERECHO: SIMULACIÓN Y RESULTADOS --- -->
+        <div class="flex-1 p-4 flex flex-col gap-4 bg-gray-950 overflow-y-auto">
+            
+            <div class="flex flex-col lg:flex-row gap-6 items-start justify-center min-h-[320px]">
+                <div class="flex flex-col items-center">
+                    <h3 class="text-gray-400 text-sm mb-2 font-medium flex items-center gap-2">
+                        <!-- Icono MousePointer2 -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3zM13 13l6 6"/></svg> Distribución de Dosis
+                    </h3>
+                    <div id="heatmap-container">
+                        <!-- Mapa de calor se renderizará aquí -->
+                    </div>
+                </div>
+
+                <div class="flex-1 w-full max-w-md">
+                    <h3 class="text-gray-400 text-sm mb-2 font-medium flex items-center gap-2">
+                        <!-- Icono TrendingUp -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 13 15 20 8 13 2 13"/><polyline points="22 13 15 7 8 13 2 13"/></svg> Histograma Dosis-Volumen
+                    </h3>
+                    <div id="dvh-graph" class="h-64 w-full dvh-graph">
+                        <!-- Gráfico DVH se renderizará aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resultados Clínicos -->
+            <div id="metrics-panel" class="bg-gray-900 p-4 rounded-xl border border-gray-800 mt-auto">
+                <!-- Métricas se renderizarán aquí -->
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTES Y ESTADO GLOBAL ---
+
+        const GRID_SIZE = 60; 
+        const MAX_DOSE_DISPLAY = 110;
+
+        const FIXED_ANATOMY = {
+            BODY: { cx: 30, cy: 30, rx: 28, ry: 22 },
+        };
+
+        const COLORS = {
+            PTV: '#ef4444', 
+            OAR_BASE: '#3b82f6', 
+            BODY: '#374151', 
+            BEAM: '#fbbf24',
+        };
+
+        let state = {
+            mode: 'planning',
+            ptv: { cx: 30, cy: 25, r: 6 },
+            oars: [{ id: 1, cx: 30, cy: 38, r: 5, name: 'Recto' }],
+            beams: [{ id: 1, angle: 0, weight: 1.0, wedge: 0, width: 16 }],
+            doseMatrix: [],
+            dvhData: { ptv: [], oars: [] },
+            metrics: { ptvD95: 0, ptvMax: 0, oars: [] }
+        };
+
+        // --- UTILIDADES ---
+
+        const getOarColor = (index) => {
+            const hues = [210, 190, 240, 170];
+            return `hsl(${hues[index % hues.length]}, 80%, 60%)`;
+        };
+
+        const isInsideEllipse = (x, y, { cx, cy, rx, ry }) => ((Math.pow(x - cx, 2) / Math.pow(rx, 2)) + (Math.pow(y - cy, 2) / Math.pow(ry, 2))) <= 1;
+        const isInsideCircle = (x, y, { cx, cy, r }) => Math.sqrt(Math.pow(x - cx, 2) + Math.pow(y - cy, 2)) <= r;
+
+        // --- LÓGICA DE FÍSICA Y DOSIMETRÍA ---
+
+        function calculateSingleBeamDose(x, y, beam) {
+            // El isocentro es el centro del PTV
+            const isoX = state.ptv.cx; 
+            const isoY = state.ptv.cy; 
+            const dx = x - isoX;
+            const dy = y - isoY;
+            const rad = (beam.angle * Math.PI) / 180;
+            
+            // Transformación de coordenadas al marco del haz
+            const beamX = dx * Math.cos(rad) - dy * Math.sin(rad);
+            const beamY = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+            const halfWidth = beam.width / 2;
+            if (Math.abs(beamX) > halfWidth) return 0; // Fuera de la apertura
+
+            // Atenuación con la profundidad (aproximación simple)
+            let depthFactor = Math.exp(-0.03 * (beamY + 10));
+            
+            // Penumbra
+            const penumbra = 2; 
+            const distToEdge = halfWidth - Math.abs(beamX);
+            let edgeFactor = 1;
+            if (distToEdge < penumbra) edgeFactor = distToEdge / penumbra;
+
+            // Efecto de la cuña (wedge)
+            let wedgeFactor = 1;
+            if (beam.wedge > 0) {
+              const gradient = (beamX + halfWidth) / (beam.width); 
+              const attenuationStrength = (beam.wedge / 90) * 0.8; 
+              wedgeFactor = 1 - (gradient * attenuationStrength);
+            }
+
+            const baseOutput = 50; 
+            return baseOutput * beam.weight * depthFactor * edgeFactor * wedgeFactor;
+        }
+
+        function calculateDoseDistribution() {
+            const matrix = [];
+            const ptvDoses = [];
+            const oarsDoses = state.oars.map(() => []);
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                const row = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const px = x;
+                    const py = y;
+
+                    const inBody = isInsideEllipse(px, py, FIXED_ANATOMY.BODY);
+                    const inPTV = isInsideCircle(px, py, state.ptv); 
+                    
+                    const inOARIndices = [];
+                    state.oars.forEach((oar, idx) => {
+                        if (isInsideCircle(px, py, oar)) inOARIndices.push(idx);
+                    });
+
+                    let totalDose = 0;
+
+                    if (inBody) {
+                        state.beams.forEach(beam => {
+                            totalDose += calculateSingleBeamDose(px, py, beam);
+                        });
+                    }
+
+                    row.push({ x, y, dose: totalDose, inBody });
+
+                    if (inPTV) ptvDoses.push(totalDose);
+                    inOARIndices.forEach(idx => oarsDoses[idx].push(totalDose));
+                }
+                matrix.push(row);
+            }
+
+            state.doseMatrix = matrix;
+            calculateDVH(ptvDoses, oarsDoses);
+            renderAll();
+        }
+
+        function calculateDVH(ptvDoses, oarsDosesArray) {
+            const generateCurve = (doses) => {
+                if (doses.length === 0) return [];
+                doses.sort((a, b) => b - a);
+                const totalVol = doses.length;
+                const points = [];
+                for (let d = 0; d <= MAX_DOSE_DISPLAY; d+=2) {
+                    const count = doses.filter(dose => dose >= d).length;
+                    points.push({ dose: d, vol: (count / totalVol) * 100 });
+                }
+                return points;
+            };
+
+            state.dvhData.ptv = generateCurve(ptvDoses);
+            state.dvhData.oars = oarsDosesArray.map(doses => generateCurve(doses));
+
+            // Métricas
+            ptvDoses.sort((a, b) => b - a);
+            const ptvD95Val = ptvDoses[Math.floor(ptvDoses.length * 0.95)] || 0;
+            const ptvMaxVal = ptvDoses[0] || 0;
+
+            const oarsMetrics = oarsDosesArray.map((doses, idx) => {
+               const count20 = doses.filter(d => d >= 20).length;
+               const v20 = doses.length > 0 ? (count20 / doses.length) * 100 : 0;
+               doses.sort((a, b) => b - a);
+               const max = doses.length > 0 ? doses[0] : 0;
+               return { id: state.oars[idx].id, v20: v20.toFixed(1), max: max.toFixed(1) };
+            });
+
+            state.metrics = {
+                ptvD95: ptvD95Val.toFixed(1),
+                ptvMax: ptvMaxVal.toFixed(1),
+                oars: oarsMetrics
+            };
+        }
+
+        // --- GESTIÓN DE ESTADO (Actualización de Data) ---
+
+        function updateState(path, value) {
+            // Ejemplo: updateState('ptv.r', 10) o updateState('beams[0].angle', 90)
+            const parts = path.split('.');
+            let current = state;
+            for (let i = 0; i < parts.length - 1; i++) {
+                let part = parts[i];
+                if (part.includes('[')) {
+                    const match = part.match(/(\w+)\[(\d+)\]/);
+                    if (match) {
+                        current = current[match[1]][parseInt(match[2])];
+                    }
+                } else {
+                    current = current[part];
+                }
+            }
+            current[parts[parts.length - 1]] = value;
+            calculateDoseDistribution(); // Recalcular después de cualquier cambio de estado
+        }
+
+        function setMode(newMode) {
+            state.mode = newMode;
+            // Actualizar botones de modo
+            const planningBtn = document.getElementById('mode-planning');
+            const anatomyBtn = document.getElementById('mode-anatomy');
+
+            if (newMode === 'planning') {
+                planningBtn.className = 'flex items-center justify-center gap-2 py-2 text-sm rounded-md transition bg-indigo-600 text-white font-medium';
+                anatomyBtn.className = 'flex items-center justify-center gap-2 py-2 text-sm rounded-md transition text-gray-400 hover:bg-gray-800';
+            } else {
+                anatomyBtn.className = 'flex items-center justify-center gap-2 py-2 text-sm rounded-md transition bg-blue-600 text-white font-medium';
+                planningBtn.className = 'flex items-center justify-center gap-2 py-2 text-sm rounded-md transition text-gray-400 hover:bg-gray-800';
+            }
+            renderControls();
+        }
+
+        function updatePtv(field, value) {
+            let numVal = Number(value);
+            // Limitar el radio
+            if (field === 'r') numVal = Math.max(3, Math.min(15, numVal)); 
+            // Limitar posición
+            if (field === 'cx' || field === 'cy') numVal = Math.max(5, Math.min(55, numVal)); 
+            state.ptv[field] = numVal;
+            calculateDoseDistribution();
+        }
+
+        function updateBeam(id, field, value) {
+            state.beams = state.beams.map(b => b.id === id ? { ...b, [field]: Number(value) } : b);
+            calculateDoseDistribution();
+        }
+
+        function addBeam() {
+            const newId = state.beams.length > 0 ? Math.max(...state.beams.map(b => b.id)) + 1 : 1;
+            const lastAngle = state.beams.length > 0 ? state.beams[state.beams.length - 1].angle : -45;
+            state.beams.push({ id: newId, angle: (lastAngle + 45) % 360, weight: 1.0, wedge: 0, width: 16 });
+            calculateDoseDistribution();
+        }
+
+        function removeBeam(id) {
+            state.beams = state.beams.filter(b => b.id !== id);
+            calculateDoseDistribution();
+        }
+
+        function updateOar(id, field, value) {
+            let numVal = Number(value);
+            if (field === 'r') numVal = Math.max(2, Math.min(10, numVal)); 
+            state.oars = state.oars.map(o => o.id === id ? { ...o, [field]: numVal } : o);
+            calculateDoseDistribution();
+        }
+
+        function updateOarName(id, name) {
+            state.oars = state.oars.map(o => o.id === id ? { ...o, name: name } : o);
+            renderMetrics(); // Solo renderizamos métricas para actualizar la leyenda
+        }
+
+        function addOar() {
+            const newId = state.oars.length > 0 ? Math.max(...state.oars.map(o => o.id)) + 1 : 1;
+            state.oars.push({ id: newId, cx: 40, cy: 40, r: 4, name: `OAR ${newId}` });
+            calculateDoseDistribution();
+        }
+
+        function removeOar(id) {
+            state.oars = state.oars.filter(o => o.id !== id);
+            calculateDoseDistribution();
+        }
+
+        function resetApp() {
+            state.beams = [{ id: 1, angle: 0, weight: 1.0, wedge: 0, width: 16 }];
+            state.oars = [{ id: 1, cx: 30, cy: 38, r: 5, name: 'Recto' }];
+            state.ptv = { cx: 30, cy: 25, r: 6 };
+            calculateDoseDistribution();
+        }
+
+        // --- RENDERIZADO DE COMPONENTES ---
+
+        function renderControls() {
+            const panel = document.getElementById('controls-panel');
+            let htmlContent = '';
+
+            if (state.mode === 'planning') {
+                // --- CONTROLES DE HACES ---
+                htmlContent += `
+                    <div class="flex justify-between items-center">
+                        <h2 class="font-semibold text-gray-300 text-sm uppercase tracking-wider">Haces de Irradiación</h2>
+                        <button onclick="addBeam()" class="flex items-center gap-1 text-xs bg-indigo-600 hover:bg-indigo-700 px-2 py-1 rounded transition text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Añadir
+                        </button>
+                    </div>
+                `;
+
+                state.beams.forEach((beam, idx) => {
+                    htmlContent += `
+                        <div class="bg-gray-900 p-3 rounded border border-gray-700 relative">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-bold text-yellow-500">Haz ${idx + 1}</span>
+                                <button onclick="removeBeam(${beam.id})" class="text-gray-600 hover:text-red-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <label class="block text-gray-500 mb-1">Gantry (°)</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="range" min="0" max="360" value="${beam.angle}" oninput="updateBeam(${beam.id}, 'angle', this.value)" class="flex-1"/>
+                                        <span class="w-8 text-right">${beam.angle}°</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 mb-1">Cuña (°)</label>
+                                    <select value="${beam.wedge}" onchange="updateBeam(${beam.id}, 'wedge', this.value)" class="w-full bg-gray-800 border border-gray-600 rounded px-1 py-1 text-gray-200">
+                                        <option value="0">Ninguna</option>
+                                        <option value="15">15°</option>
+                                        <option value="30">30°</option>
+                                        <option value="45">45°</option>
+                                        <option value="60">60°</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 mb-1">Peso</label>
+                                    <input type="number" step="0.1" min="0" max="3" value="${beam.weight}" oninput="updateBeam(${beam.id}, 'weight', this.value)" class="w-full bg-gray-800 border border-gray-600 rounded px-1"/>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 mb-1">Ancho</label>
+                                    <input type="range" min="5" max="30" value="${beam.width}" oninput="updateBeam(${beam.id}, 'width', this.value)" class="flex-1 w-full"/>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+            } else {
+                // --- CONTROLES DE ANATOMÍA (PTV y OARs) ---
+                htmlContent += `
+                    <div class="bg-blue-900/20 p-3 rounded text-xs text-blue-200 border border-blue-800/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline mr-1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> Define la geometría del paciente. Mover el PTV cambia el isocentro de todos los haces.
+                    </div>
+                    
+                    <!-- PTV Control Block -->
+                    <div class="bg-gray-800 p-3 rounded border border-red-900/30 border-l-4 border-l-red-500">
+                        <h3 class="text-red-400 font-bold text-sm mb-2">PTV (Volumen de Tratamiento)</h3>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                                <label class="block text-gray-500 mb-1 flex items-center gap-1">X</label>
+                                <input type="number" min="5" max="55" step="1" value="${state.ptv.cx}" oninput="updatePtv('cx', this.value)" class="w-full bg-gray-900 border border-gray-600 rounded px-1 text-center"/>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 mb-1 flex items-center gap-1">Y</label>
+                                <input type="number" min="5" max="55" step="1" value="${state.ptv.cy}" oninput="updatePtv('cy', this.value)" class="w-full bg-gray-900 border border-gray-600 rounded px-1 text-center"/>
+                            </div>
+                            <div>
+                                <label class="block text-gray-500 mb-1 flex items-center gap-1">Radio</label>
+                                <input type="number" min="3" max="15" step="1" value="${state.ptv.r}" oninput="updatePtv('r', this.value)" class="w-full bg-gray-900 border border-gray-600 rounded px-1 text-center"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- OARs Controls Block -->
+                    <div class="flex justify-between items-center mt-3">
+                        <h2 class="font-semibold text-gray-300 text-sm uppercase tracking-wider">Órganos de Riesgo</h2>
+                        <button onclick="addOar()" class="flex items-center gap-1 text-xs bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded transition text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Añadir
+                        </button>
+                    </div>
+                `;
+                
+                state.oars.forEach((oar, idx) => {
+                    const oarColor = getOarColor(idx);
+                    htmlContent += `
+                        <div class="bg-gray-900 p-3 rounded border border-l-4 relative" style="border-left-color: ${oarColor}; border-color: #374151;">
+                            <div class="flex justify-between items-center mb-2">
+                                <input 
+                                    type="text" 
+                                    value="${oar.name}" 
+                                    oninput="updateOarName(${oar.id}, this.value)"
+                                    class="bg-transparent text-xs font-bold text-white border-b border-transparent hover:border-gray-600 focus:border-blue-500 outline-none w-24"
+                                />
+                                <button onclick="removeOar(${oar.id})" class="text-gray-600 hover:text-red-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-3 gap-2 text-xs">
+                                <div>
+                                    <label class="block text-gray-500 mb-1 flex items-center gap-1">X</label>
+                                    <input type="number" min="0" max="60" value="${oar.cx}" oninput="updateOar(${oar.id}, 'cx', this.value)" class="w-full bg-gray-800 border border-gray-600 rounded px-1 text-center"/>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 mb-1 flex items-center gap-1">Y</label>
+                                    <input type="number" min="0" max="60" value="${oar.cy}" oninput="updateOar(${oar.id}, 'cy', this.value)" class="w-full bg-gray-800 border border-gray-600 rounded px-1 text-center"/>
+                                </div>
+                                <div>
+                                    <label class="block text-gray-500 mb-1 flex items-center gap-1">Radio</label>
+                                    <input type="number" min="2" max="15" value="${oar.r}" oninput="updateOar(${oar.id}, 'r', this.value)" class="w-full bg-gray-800 border border-gray-600 rounded px-1 text-center"/>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            panel.innerHTML = htmlContent;
+        }
+
+        function renderHeatmap() {
+            const container = document.getElementById('heatmap-container');
+            const matrix = state.doseMatrix;
+            if (!matrix.length) {
+                container.innerHTML = '<div class="w-[300px] h-[300px] flex items-center justify-center bg-gray-800/50 rounded-full text-gray-400">Calculando...</div>';
+                return;
+            }
+
+            let pixelHtml = '';
+            matrix.forEach(row => {
+                pixelHtml += '<div class="flex flex-1">';
+                row.forEach(pixel => {
+                    let bg = 'transparent';
+                    if (pixel.inBody) {
+                        if (pixel.dose < 5) bg = COLORS.BODY;
+                        else if (pixel.dose < 50) bg = `rgba(16, 185, 129, ${pixel.dose/100})`; // Verde
+                        else if (pixel.dose < 90) bg = `rgba(245, 158, 11, ${pixel.dose/110})`; // Naranja
+                        else bg = `rgba(220, 38, 38, ${Math.min(pixel.dose/100, 1)})`; // Rojo
+                    }
+                    // Utilizamos un truco CSS: flex-1 en los contenedores y los píxeles
+                    pixelHtml += `<div class="flex-1" style="background-color: ${bg};"></div>`;
+                });
+                pixelHtml += '</div>';
+            });
+            
+            // SVG Overlay para estructuras y haces
+            const svgContent = `
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 ${GRID_SIZE} ${GRID_SIZE}">
+                    <!-- PTV -->
+                    <circle cx="${state.ptv.cx}" cy="${state.ptv.cy}" r="${state.ptv.r}" fill="none" stroke="${COLORS.PTV}" stroke-width="0.8" stroke-dasharray="2,1" />
+                    
+                    <!-- OARs Dinámicos -->
+                    ${state.oars.map((oar, idx) => `
+                        <circle cx="${oar.cx}" cy="${oar.cy}" r="${oar.r}" fill="none" stroke="${getOarColor(idx)}" stroke-width="0.8" />
+                    `).join('')}
+                    
+                    <!-- Haces -->
+                    ${state.beams.map(beam => {
+                        const rad = (beam.angle - 90) * Math.PI / 180;
+                        const startX = state.ptv.cx + 35 * Math.cos(rad);
+                        const startY = state.ptv.cy + 35 * Math.sin(rad);
+                        return `
+                            <g opacity="0.7">
+                                <line x1="${startX}" y1="${startY}" x2="${state.ptv.cx}" y2="${state.ptv.cy}" stroke="${COLORS.BEAM}" stroke-width="0.5" marker-end="url(#arrow)" />
+                                <text x="${startX}" y="${startY}" fill="${COLORS.BEAM}" font-size="3" text-anchor="middle">${beam.angle}°</text>
+                            </g>
+                        `;
+                    }).join('')}
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="${COLORS.BEAM}" />
+                        </marker>
+                    </defs>
+                </svg>
+            `;
+
+            container.innerHTML = `
+                <div class="relative bg-black overflow-hidden shadow-2xl border-2 border-gray-700 rounded-full" style="width: 300px; height: 300px;">
+                    <div class="absolute inset-0 flex flex-col">${pixelHtml}</div>
+                    ${svgContent}
+                </div>
+            `;
+        }
+
+        function renderDVHGraph() {
+            const container = document.getElementById('dvh-graph');
+            const width = 300;
+            const height = 200;
+            const padding = 30;
+            const graphW = width - padding * 2;
+            const graphH = height - padding * 2;
+
+            const makePath = (data, color) => {
+                if (!data || data.length === 0) return '';
+                let d = `M ${padding} ${padding + graphH} `;
+                data.forEach((point) => {
+                    const x = padding + (point.dose / MAX_DOSE_DISPLAY) * graphW;
+                    const y = padding + graphH - (point.vol / 100) * graphH;
+                    d += `L ${x} ${y} `;
+                });
+                return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" />`;
+            };
+
+            const legendContent = `
+                <div class="absolute top-2 right-2 flex flex-col text-xs gap-1 bg-black/50 p-2 rounded border border-gray-700">
+                    <span style="color: ${COLORS.PTV}">● PTV</span>
+                    ${state.oars.map((oar, idx) => `
+                        <span style="color: ${getOarColor(idx)}">● ${oar.name}</span>
+                    `).join('')}
+                </div>
+            `;
+
+            container.innerHTML = `
+                <div class="relative bg-gray-900 rounded border border-gray-700 p-2 h-full">
+                    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+                        <!-- Ejes -->
+                        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height-padding}" stroke="#4b5563" stroke-width="1" />
+                        <line x1="${padding}" y1="${height-padding}" x2="${width-padding}" y2="${height-padding}" stroke="#4b5563" stroke-width="1" />
+                        
+                        <!-- Línea de prescripción (95 Gy) -->
+                        <line x1="${padding + (95/MAX_DOSE_DISPLAY)*graphW}" y1="${padding}" x2="${padding + (95/MAX_DOSE_DISPLAY)*graphW}" y2="${height-padding}" stroke="#4b5563" stroke-dasharray="4" opacity="0.5" />
+                        
+                        <!-- Curvas DVH -->
+                        ${makePath(state.dvhData.ptv, COLORS.PTV)}
+                        ${state.dvhData.oars.map((curve, idx) => makePath(curve, getOarColor(idx))).join('')}
+
+                        <!-- Etiquetas -->
+                        <text x="${width/2}" y="${height-5}" fill="#9ca3af" font-size="10" text-anchor="middle">Dosis (u.a.)</text>
+                        <text x="10" y="${height/2}" fill="#9ca3af" font-size="10" text-anchor="middle" transform="rotate(-90, 10, ${height/2})">Volumen (%)</text>
+                    </svg>
+                    ${legendContent}
+                </div>
+            `;
+        }
+
+        function renderMetrics() {
+            const panel = document.getElementById('metrics-panel');
+            const metrics = state.metrics;
+            const ptvStatus = Number(metrics.ptvD95) > 95 ? 'Plan Aceptable' : 'Plan Deficiente';
+            const ptvStatusClass = Number(metrics.ptvD95) > 95 ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400';
+
+            let htmlContent = `
+                <h3 class="text-gray-200 font-semibold mb-4 flex items-center gap-2 border-b border-gray-700 pb-2">
+                    Análisis Clínico
+                    <span class="text-xs font-normal px-2 py-0.5 rounded-full ${ptvStatusClass}">${ptvStatus}</span>
+                </h3>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Tarjeta PTV -->
+                    <div class="bg-gray-800/50 p-3 rounded border border-red-900/30">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-red-400 font-bold text-sm">PTV (Tumor)</span>
+                            <span class="text-[10px] bg-red-900/50 px-1 rounded text-red-200">Objetivo &gt; 95%</span>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <span class="text-xs text-gray-500 block">Cobertura (D95)</span>
+                                <span class="text-xl font-mono font-bold ${Number(metrics.ptvD95) > 95 ? 'text-green-400' : 'text-red-400'}">${metrics.ptvD95} <span class="text-xs">Gy</span></span>
+                            </div>
+                            <div class="text-right">
+                               <span class="text-xs text-gray-500 block">Máxima</span>
+                               <span class="text-sm font-mono text-gray-300">${metrics.ptvMax}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tarjetas OARs Dinámicos -->
+                    ${metrics.oars.map((m, idx) => {
+                        const oar = state.oars.find(o => o.id === m.id);
+                        const oarColor = getOarColor(idx);
+                        const v20Class = Number(m.v20) < 20 ? 'text-green-400' : 'text-yellow-400';
+
+                        return `
+                            <div class="bg-gray-800/50 p-3 rounded border border-gray-700" style="border-top-color: ${oarColor}; border-top-width: 3px;">
+                                <div class="flex justify-between items-start mb-2">
+                                    <span class="font-bold text-sm" style="color: ${oarColor}">${oar?.name || `OAR ${idx+1}`}</span>
+                                    <span class="text-[10px] bg-gray-700 px-1 rounded text-gray-300">V20 &lt; 20%</span>
+                                </div>
+                                <div class="flex justify-between items-end">
+                                    <div>
+                                        <span class="text-xs text-gray-500 block">V20Gy</span>
+                                        <span class="text-xl font-mono font-bold ${v20Class}">${m.v20}<span class="text-sm">%</span></span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-xs text-gray-500 block">DMax</span>
+                                        <span class="text-sm font-mono text-gray-300">${m.max}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            panel.innerHTML = htmlContent;
+        }
+
+        function renderAll() {
+            renderControls();
+            renderHeatmap();
+            renderDVHGraph();
+            renderMetrics();
+        }
+
+        // --- INICIALIZACIÓN ---
+
+        window.onload = function() {
+            // Iniciar la aplicación
+            calculateDoseDistribution(); 
+        };
+
+    </script>
+</body>
+</html>
